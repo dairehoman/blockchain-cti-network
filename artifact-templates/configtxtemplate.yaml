@@ -19,7 +19,8 @@ Profiles:
                     - *ORG1
                     - *ORG2
                     - *ORG3
-    ALL-CHAN:
+                    - *ORG4
+    all-chan:
         Consortium: SampleConsortium
         Application:
             <<: *ApplicationDefaults
@@ -28,7 +29,7 @@ Profiles:
                 - *ORG2
                 - *ORG3
                 - *ORG4
-    CSIRT-CHAN:
+    csirt-chan:
         Consortium: SampleConsortium
         Application:
             <<: *ApplicationDefaults
@@ -36,14 +37,14 @@ Profiles:
                 - *ORG1
                 - *ORG2
                 - *ORG3
-    EU-CHAN:
+    eu-chan:
         Consortium: SampleConsortium
         Application:
             <<: *ApplicationDefaults
             Organizations:
                 - *ORG1
                 - *ORG3
-    IE-CHAN:
+    ie-chan:
         Consortium: SampleConsortium
         Application:
             <<: *ApplicationDefaults

@@ -44,19 +44,20 @@ function generateNetworkConfig() {
       snippet=`sed -e "s/DOMAIN/$DOMAIN/g" -e "s/ORG/$org/g" $TEMPLATES_ARTIFACTS_FOLDER/network-config-orgsnippet.json`
       out="${out//$placeholder/,$snippet}"
     done
-  out="${out//$placeholder/\}\}}"
+  eof="}}"
+  out="${out//$placeholder/${eof}}"
   echo ${out} > $GENERATED_ARTIFACTS_FOLDER/network-config.json
 }
 
 function generateOrdererArtifacts() {
-    mkdir ./channel/
+    mkdir ./artifatcs/channel
     org=$1
     echo "Creating orderer yaml files with $DOMAIN, $ORG1, $ORG2, $ORG3, $ORG4, $DEFAULT_ORDERER_PORT, $DEFAULT_WWW_PORT"
     f="$GENERATED_DOCKER_COMPOSE_FOLDER/docker-compose-$DOMAIN.yaml"
     mkdir -p "$GENERATED_ARTIFACTS_FOLDER/channel"
     generateNetworkConfig ${ORG1} ${ORG2} ${ORG3} ${ORG4}
     sed -e "s/DOMAIN/$DOMAIN/g" -e "s/ORG1/$ORG1/g" -e "s/ORG2/$ORG2/g" -e "s/ORG3/$ORG3/g" -e "s/ORG4/$ORG4/g" $TEMPLATES_ARTIFACTS_FOLDER/configtxtemplate.yaml > $GENERATED_ARTIFACTS_FOLDER/configtx.yaml
-    createChannels=("ALL-CHAN" "CSIRT-CHAN" "EU-CHAN" "IE-CHAN")    
+    createChannels=("all-chan" "csirt-chan" "eu-chan" "ie-chan")    
     for channel_name in ${createChannels[@]}
     do
         echo "Generating channel config transaction for $channel_name"
