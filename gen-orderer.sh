@@ -50,7 +50,7 @@ function generateNetworkConfig() {
 }
 
 function generateOrdererArtifacts() {
-    mkdir ./artifatcs/channel
+    # mkdir ./artifatcs/channel
     org=$1
     echo "Creating orderer yaml files with $DOMAIN, $ORG1, $ORG2, $ORG3, $ORG4, $DEFAULT_ORDERER_PORT, $DEFAULT_WWW_PORT"
     f="$GENERATED_DOCKER_COMPOSE_FOLDER/docker-compose-$DOMAIN.yaml"

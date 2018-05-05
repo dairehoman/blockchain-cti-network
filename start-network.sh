@@ -20,10 +20,11 @@ DEFAULT_PEER1_PORT=7056
 DEFAULT_PEER1_EVENT_PORT=7058
 GID=$(id -g)
 WGET_OPTS="--verbose -N"
-CHAINCODE_COMMON_NAME=reference
-CHAINCODE_BILATERAL_NAME=relationship
-CHAINCODE_COMMON_INIT='{"Args":["init","a","100","b","100"]}'
-CHAINCODE_BILATERAL_INIT='{"Args":["init","a","100","b","100"]}'
+
+CHAINCODE_TLP_GREEN=tlpgreen
+CHAINCODE_TLP_AMBER=tlpamber
+CHAINCODE_TLP_RED=tlpred
+CHAINCODE_INIT='{"Args":["init"]}'
 
 function info() {
     echo "=============  info()  ===================="
@@ -35,6 +36,7 @@ function info() {
 function dockerComposeUp() {
   compose_file="$GENERATED_DOCKER_COMPOSE_FOLDER/docker-compose-$1.yaml"
   echo "starting docker instances from $compose_file"
+  # might cause a problem
   TIMEOUT=${CLI_TIMEOUT} docker-compose -f ${compose_file} up -d 2>&1
   if [ $? -ne 0 ]; then
     echo "ERROR !!!! Unable to start network"
@@ -50,17 +52,17 @@ function installChaincode() {
   f="$GENERATED_DOCKER_COMPOSE_FOLDER/docker-compose-${org}.yaml"
   p=${n}
   l=golang
-  echo "installing chaincode $n to peers of $org from ./chaincode/go/$p $v using $f"
-  echo "docker-compose --file ${f} run --rm \"cli.$org.$DOMAIN\" bash -c \"CORE_PEER_ADDRESS=peer0.$org.$DOMAIN:7051 peer chaincode install -n $n -v $v -p $p -l $l "
+  echo "installing chaincode $n to peers of $org from ./chaincode/$p $v using $f"
+  echo "docker-compose --file ${f} run  \"cli.$org.$DOMAIN\" bash -c \"CORE_PEER_ADDRESS=peer0.$org.$DOMAIN:7051 peer chaincode install -n $n -v $v -p $p -l $l "
   echo " && CORE_PEER_ADDRESS=peer1.$org.$DOMAIN:7051 peer chaincode install -n $n -v $v -p $p -l $l\""
-  docker-compose --file ${f} run --rm "cli.$org.$DOMAIN" bash -c "CORE_PEER_ADDRESS=peer0.$org.$DOMAIN:7051 peer chaincode install -n $n -v $v -p $p -l $l \
+  docker-compose --file ${f} run  "cli.$org.$DOMAIN" bash -c "CORE_PEER_ADDRESS=peer0.$org.$DOMAIN:7051 peer chaincode install -n $n -v $v -p $p -l $l \
   && CORE_PEER_ADDRESS=peer1.$org.$DOMAIN:7051 peer chaincode install -n $n -v $v -p $p -l $l"
 }
 
 function installAll() {
   org=$1
   sleep 2
-  for chaincode_name in ${CHAINCODE_COMMON_NAME} ${CHAINCODE_BILATERAL_NAME}
+  for chaincode_name in ${CHAINCODE_TLP_GREEN} ${CHAINCODE_TLP_AMBER} ${CHAINCODE_TLP_RED}
   do
     installChaincode ${org} ${chaincode_name} "1.0"
   done
@@ -71,10 +73,10 @@ function createChannel() {
     channel_name=$2
     f="$GENERATED_DOCKER_COMPOSE_FOLDER/docker-compose-${org}.yaml"
     info "creating channel $channel_name by $org using $f"
-    echo "docker-compose --file ${f} run --rm \"cli.$org.$DOMAIN\" bash -c \"peer channel create -o orderer.$DOMAIN:7050 -c $channel_name -f /etc/hyperledger/artifacts/channel/$channel_name.tx --tls --cafile /etc/hyperledger/crypto/orderer/tls/ca.crt\""
-    docker-compose --file ${f} run --rm "cli.$org.$DOMAIN" bash -c "peer channel create -o orderer.$DOMAIN:7050 -c $channel_name -f /etc/hyperledger/artifacts/channel/$channel_name.tx --tls --cafile /etc/hyperledger/crypto/orderer/tls/ca.crt"
+    echo "docker-compose --file ${f} run  \"cli.$org.$DOMAIN\" bash -c \"peer channel create -o orderer.$DOMAIN:7050 -c $channel_name -f /etc/hyperledger/artifacts/channel/$channel_name.tx --tls --cafile /etc/hyperledger/crypto/orderer/tls/ca.crt\""
+    docker-compose --file ${f} run  "cli.$org.$DOMAIN" bash -c "peer channel create -o orderer.$DOMAIN:7050 -c $channel_name -f /etc/hyperledger/artifacts/channel/$channel_name.tx --tls --cafile /etc/hyperledger/crypto/orderer/tls/ca.crt"
     echo "changing ownership of channel block files"
-    docker-compose --file ${f} run --rm "cli.$DOMAIN" bash -c "chown -R $UID:$GID ."
+    docker-compose --file ${f} run  "cli.$DOMAIN" bash -c "chown -R $UID:$GID ."
     d="$GENERATED_ARTIFACTS_FOLDER"
     echo "copying channel block file from ${d} to be served by www.$org.$DOMAIN"
     cp "${d}/$channel_name.block" "www/${d}"
@@ -85,8 +87,8 @@ function joinChannel() {
   channel_name=$2
   f="$GENERATED_DOCKER_COMPOSE_FOLDER/docker-compose-${org}.yaml"
   echo "joining channel $channel_name by all peers of $org using $f"
-  docker-compose --file ${f} run --rm "cli.$org.$DOMAIN" bash -c "CORE_PEER_ADDRESS=peer0.$org.$DOMAIN:7051 peer channel join -b $channel_name.block"
-  docker-compose --file ${f} run --rm "cli.$org.$DOMAIN" bash -c "CORE_PEER_ADDRESS=peer1.$org.$DOMAIN:7051 peer channel join -b $channel_name.block"
+  docker-compose --file ${f} run  "cli.$org.$DOMAIN" bash -c "CORE_PEER_ADDRESS=peer0.$org.$DOMAIN:7051 peer channel join -b $channel_name.block"
+  docker-compose --file ${f} run  "cli.$org.$DOMAIN" bash -c "CORE_PEER_ADDRESS=peer1.$org.$DOMAIN:7051 peer channel join -b $channel_name.block"
 }
 
 function instantiateChaincode() {
@@ -100,7 +102,7 @@ function instantiateChaincode() {
     c="CORE_PEER_ADDRESS=peer0.$org.$DOMAIN:7051 peer chaincode instantiate -n $n -v 1.0 -c '$i' -o orderer.$DOMAIN:7050 -C $channel_name --tls --cafile /etc/hyperledger/crypto/orderer/tls/ca.crt"
     d="cli.$org.$DOMAIN"
     echo "instantiating with $d by $c"
-    docker-compose --file ${f} run --rm ${d} bash -c "${c}"
+    docker-compose --file ${f} run  ${d} bash -c "${c}"
   done
 }
 
@@ -132,21 +134,27 @@ for org in ${ORG1} ${ORG2} ${ORG3} ${ORG4}
   done
 
 # all-chan
-createJoinInstantiateWarmUp a all-chan ${CHAINCODE_COMMON_NAME} ${CHAINCODE_COMMON_INIT}
-joinWarmUp b all-chan ${CHAINCODE_COMMON_NAME}
-joinWarmUp c all-chan ${CHAINCODE_COMMON_NAME}
-joinWarmUp d all-chan ${CHAINCODE_COMMON_NAME}
+createJoinInstantiateWarmUp a all-chan ${CHAINCODE_TLP_GREEN} ${CHAINCODE_INIT}
+joinWarmUp b all-chan ${CHAINCODE_TLP_GREEN}
+joinWarmUp c all-chan ${CHAINCODE_TLP_GREEN}
+joinWarmUp d all-chan ${CHAINCODE_TLP_GREEN}
 
 # csirt-chan
-createJoinInstantiateWarmUp a csirt-chan ${CHAINCODE_BILATERAL_NAME} ${CHAINCODE_BILATERAL_INIT}
-joinWarmUp b csirt-chan ${CHAINCODE_BILATERAL_NAME}
-joinWarmUp c csirt-chan ${CHAINCODE_BILATERAL_NAME}
+createJoinInstantiateWarmUp a csirt-chan ${CHAINCODE_TLP_AMBER} ${CHAINCODE_INIT}
+joinWarmUp b csirt-chan ${CHAINCODE_TLP_AMBER}
+joinWarmUp c csirt-chan ${CHAINCODE_TLP_AMBER}
 
 # eu-chan
-createJoinInstantiateWarmUp a eu-chan ${CHAINCODE_BILATERAL_NAME} ${CHAINCODE_BILATERAL_INIT}
-joinWarmUp b eu-chan ${CHAINCODE_BILATERAL_NAME}
-joinWarmUp c eu-chan ${CHAINCODE_BILATERAL_NAME}
+createJoinInstantiateWarmUp a eu-chan ${CHAINCODE_TLP_AMBER} ${CHAINCODE_INIT}
+joinWarmUp b eu-chan ${CHAINCODE_TLP_AMBER}
+joinWarmUp c eu-chan ${CHAINCODE_TLP_AMBER}
 
 # ie-chan
-createJoinInstantiateWarmUp a ie-chan ${CHAINCODE_BILATERAL_NAME} ${CHAINCODE_BILATERAL_INIT}
-joinWarmUp d ie-chan ${CHAINCODE_BILATERAL_NAME}
+createJoinInstantiateWarmUp a ie-chan ${CHAINCODE_TLP_RED} ${CHAINCODE_INIT}
+joinWarmUp d ie-chan ${CHAINCODE_TLP_RED}
+
+
+# invoke initLedger
+# docker-compose --file ./dockercompose/docker-compose-a.yaml run  "cli.a.cti.com" bash -c "CORE_PEER_ADDRESS=peer0.a.cti.com:7051 peer chaincode invoke -n ioc -c '{\"Args\":[\"initLedger\"]}' -C all-chan"
+
+# docker-compose --file ./dockercompose/docker-compose-a.yaml run  "cli.a.cti.com" bash -c "CORE_PEER_ADDRESS=peer0.a.cti.com:7051 peer chaincode query -n ioc -c ${INIT_ALLCHAN} -C all-chan"
